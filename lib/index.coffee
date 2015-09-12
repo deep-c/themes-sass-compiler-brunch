@@ -13,7 +13,7 @@ extend = (object, source) ->
     object[key] = source[key]
   object
 
-class ThemesCSSCompiler
+class ThemesSASSCompiler
   brunchPlugin: yes
   type: 'stylesheet'
   extension: 'scss'
@@ -148,7 +148,7 @@ class ThemesCSSCompiler
                     map = result.map.toString()
                     fs.writeFile writePath.concat('.map'), map, (err)->
                       if err
-                        console.log(error)
+                        console.log error.red
 
                   #Recursively go through each theme dir and compile until they are all done.
                   #If all done fire callback
@@ -169,4 +169,4 @@ class ThemesCSSCompiler
 
     return
 
-module.exports = ThemesCSSCompiler
+module.exports = ThemesSASSCompiler

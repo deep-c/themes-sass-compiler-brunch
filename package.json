@@ -13,7 +13,6 @@
   "author": "Deeptesh Chagan",
   "license": "MIT",
   "dependencies": {
-    "coffee-script-brunch": "^1.8.2",
     "progeny": "^0.5.2",
     "node-sass": "^3.3.2",
     "colors": "^1.1.2",
