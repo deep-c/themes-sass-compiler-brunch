@@ -1,14 +1,14 @@
 {
-  "name": "themes-compiler-brunch",
-  "version": "0.0.0",
-  "description": "Create a themes structure based off a 'base' theme and allow overriding on settings/files on a per theme basis",
+  "name": "themes-sass-compiler-brunch",
+  "version": "1.0.0",
+  "description": "Create a themes structure based off a 'base' theme and allow overriding of settings/files on a per theme basis",
   "main": "./lib/index",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/deep-c/themes-compiler-brunch.git"
+    "url": "git://github.com/deep-c/themes-sass-compiler-brunch.git"
   },
   "author": "Deeptesh Chagan",
   "license": "MIT",
