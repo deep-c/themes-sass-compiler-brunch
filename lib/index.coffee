@@ -1,12 +1,12 @@
 sysPath = require('path')
-os = require('os')
 util = require('util')
-progeny = require('progeny')
 libsass = require('node-sass')
 fs =  require('fs')
 colors = require('colors')
 mkdirp = require('mkdirp')
-sassRe = /\.s[ac]ss$/
+anymatch = require('anymatch')
+
+sassRe = /\.[sc][ac]?ss$/
 
 extend = (object, source) ->
   for key of source
@@ -16,20 +16,21 @@ extend = (object, source) ->
 class ThemesSASSCompiler
   brunchPlugin: yes
   type: 'stylesheet'
-  extension: 'scss'
-  pattern: /\.s[ac]ss$/
+  pattern: sassRe
 
   constructor: (@cfg) ->
+    @joinTo = @cfg.files.stylesheets.joinTo if @cfg.files and @cfg.files.stylesheets and @cfg.files.stylesheets.joinTo
     @rootPath = @cfg.paths.root;
     @optimize = @cfg.optimize
-    @config = (@cfg.plugins && @cfg.plugins.themes_compiler) || {};
+    @config = (@cfg.plugins && @cfg.plugins.themes_sass) || {};
     @baseDir = if @config.options and @config.options.baseDir then @config.options.baseDir else 'base'
     @sassDir = if @config.options and @config.options.sassDir then @config.options.sassDir else 'sass'
     @absRootDir = sysPath.join sysPath.resolve(), 'app'
     @outPath = sysPath.resolve(@cfg.paths.public)
+    @outputPath = sysPath.resolve(@cfg.paths.public)
     if @config.options and @config.options.includePaths
       @includePaths = @config.options.includePaths
-
+    @outStyle = if @cfg.optimize then 'compressed' else 'nested'
     @themeDirs = @_getDirectories @absRootDir
     @themeSassFiles = {}
 
@@ -37,19 +38,6 @@ class ThemesSASSCompiler
       themeSassDir = sysPath.join @absRootDir, name , @sassDir
       files = @_findFilesInDir(themeSassDir, name ,'.scss')
       @themeSassFiles[name] = files
-
-#    console.log @themeSassFiles
-
-    @getDependencies = progeny(
-      rootPath: @rootPath
-      altPaths: @includePaths
-      reverseArgs: true)
-
-    @seekCompass = progeny(
-      rootPath: @rootPath,
-      exclusion: '',
-      potentialDeps: true
-    )
 
   _findFilesInDir: (startPath, theme, filter) =>
     results = {}
@@ -62,13 +50,8 @@ class ThemesSASSCompiler
       filename = sysPath.join(startPath, files[i])
       stat = fs.lstatSync(filename)
       if stat.isDirectory()
-#        results = results.concat(@_findFilesInDir(filename, theme, filter))
         results = extend(results, @_findFilesInDir(filename, theme, filter))
-        #recurse
       else if filename.indexOf(filter) >= 0
-        #console.log '-- found: ', filename
-        #old filename.replace(sysPath.join(@absRootDir, theme , @sassDir), '')
-        #sysPath.relative(sysPath.join(@absRootDir, theme, @sassDir), filename).replace(sassRe, '').replace('_','')
         importPath = filename.replace('_', '').replace(sassRe,'')
         results[importPath] = filename
       i++
@@ -88,18 +71,15 @@ class ThemesSASSCompiler
     includePaths
 
   _urlImporter: (url, prev, theme)=>
-#    console.log url, '<-', prev
     #Convert import urls to absolute paths and match against theme for substitution
     getAbsImport = (imp_url, prev_url) =>
       rootSassDir = sysPath.join(@absRootDir, theme, @sassDir)
       if prev_url != "stdin"
         import_url = sysPath.dirname(sysPath.join(rootSassDir, prev_url.replace(/app\/?base\/?sass\/?/,'')))
         import_url = sysPath.join(import_url,imp_url)
-        match_file = @themeSassFiles[theme].hasOwnProperty(import_url)
       else
         import_url = sysPath.join(rootSassDir, imp_url.replace(/app\/?base\/?sass\/?/,''))
-        match_file = @themeSassFiles[theme].hasOwnProperty(import_url)
-
+      match_file = @themeSassFiles[theme].hasOwnProperty(import_url)
       if match_file
         import_url = @themeSassFiles[theme][import_url]
       else
@@ -109,51 +89,51 @@ class ThemesSASSCompiler
       url = getAbsImport(url, prev)
     return { file: url }
 
-  _nativeCompile: (source, themeDirs ,callback)=>
+  _nativeCompile: (source, themeDirs, callback)=>
     theme = themeDirs.pop()
-    self = @
+    outputPath = source.outputPath.replace new RegExp(@baseDir), theme
+
     libsass.render {
       data: source.data
       includePaths: @_getIncludePaths(source.path)
-      outputStyle: 'nested'
+      outputStyle: @outStyle
       sourceComments: !@optimize
       sourceMap: true
-      outFile: sysPath.join(self.outPath, theme, 'css')
+      outFile: outputPath
       importer: (url, prev, done)=>
           result = @_urlImporter(url, prev, theme)
           return { file: result.file }
-    }, (error, result) ->
+    }, (error, result) =>
       if error
         callback error.message || util.inspect(error)
       else
         if result.css
           data = result.css.toString()
-          writePath = sysPath.join(self.outPath, theme, "css", sysPath.normalize(sysPath.basename(source.path, '.scss')))
-          mkdirp sysPath.dirname(writePath), (err)->
+          mkdirp sysPath.dirname(outputPath), (err)=>
             if err
               console.log err.red
             else
-              fs.writeFile writePath.concat('.css'), data, (err)->
+              fs.writeFile outputPath, data, (err)=>
                 if err
                   console.log err.red
                 else
                   #Output successful file creation to console.
                   msg = 'Wrote: '.green + theme.toUpperCase().underline + ' ' +
-                        sysPath.basename(source.path, '.scss').bold+'.css'.bold +
-                        ' -> '.reset + sysPath.join(self.outPath, theme, 'css')
+                        sysPath.basename(outputPath).bold +
+                        ' -> '.reset + sysPath.dirname(outputPath)
                   console.log(msg)
 
                   #Create the .map files for each css file if map data exists.
                   if result.map
                     map = result.map.toString()
-                    fs.writeFile writePath.concat('.map'), map, (err)->
+                    fs.writeFile outputPath.concat('.map'), map, (err)=>
                       if err
                         console.log error.red
 
                   #Recursively go through each theme dir and compile until they are all done.
-                  #If all done fire callback
+                  #If file written for each theme fire final callback to brunch to signal completion of compile
                   if themeDirs.length
-                    self._nativeCompile(source, themeDirs, callback)
+                    @_nativeCompile(source, themeDirs, callback)
                   else
                     callback null, null
 
@@ -161,10 +141,14 @@ class ThemesSASSCompiler
   compile: (data, path, callback) =>
     if !data.trim().length
       return callback(null, '')
+    outputPath = @outputPath
+    for outPath, inPath of @joinTo
+        outputPath = sysPath.join(@outputPath, outPath) if anymatch(inPath, path)
     dirs = @_getDirectories @absRootDir
     source =
       data: data
       path: path
+      outputPath: outputPath
     @_nativeCompile source, dirs, callback
 
     return
