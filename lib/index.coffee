@@ -26,8 +26,7 @@ class ThemesSASSCompiler
     @baseDir = if @config.options and @config.options.baseDir then @config.options.baseDir else 'base'
     @sassDir = if @config.options and @config.options.sassDir then @config.options.sassDir else 'sass'
     @absRootDir = sysPath.join sysPath.resolve(), 'app'
-    @outPath = sysPath.resolve(@cfg.paths.public)
-    @outputPath = sysPath.resolve(@cfg.paths.public)
+    @outputPath = sysPath.resolve @cfg.paths.public
     if @config.options and @config.options.includePaths
       @includePaths = @config.options.includePaths
     @outStyle = if @cfg.optimize then 'compressed' else 'nested'
