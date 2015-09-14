@@ -38,9 +38,11 @@ For example
                     - _header.scss (custom _header.scss file)
 
 Then base.scss is rendered for each theme:  
-  
-+ {output-folder}/base.css (import uses the header.scss file located in base theme when import is referenced) 
-+ {output-folder}/base.css (import uses the header.scss file located in theme2 theme when import is referenced)  
+
++ FOR base 
+    - {output-folder}/base.css (import uses the header.scss file located in base theme when import is referenced) 
++ FOR theme2  
+    - {output-folder}/base.css (import uses the header.scss file located in theme2 theme when import is referenced)  
 
 Known Issues  
 + ~~Currently file import substition only works with scss not sass due to pattern matching error~~
