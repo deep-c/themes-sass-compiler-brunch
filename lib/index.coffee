@@ -25,23 +25,25 @@ class ThemesSASSCompiler
     @config = (@cfg.plugins && @cfg.plugins.themes_sass) || {};
     @baseDir = if @config.options and @config.options.baseDir then @config.options.baseDir else 'base'
     @sassDir = if @config.options and @config.options.sassDir then @config.options.sassDir else 'sass'
-    @absRootDir = sysPath.join sysPath.resolve(), 'app'
+    @absAppDir = sysPath.resolve('app')
+    @baseSassDir = sysPath.join('app', @baseDir, @sassDir)
     @outputPath = sysPath.resolve @cfg.paths.public
     if @config.options and @config.options.includePaths
       @includePaths = @config.options.includePaths
     @outStyle = if @cfg.optimize then 'compressed' else 'nested'
-    @themeDirs = @_getDirectories @absRootDir
+    @themeDirs = @_getDirectories @absAppDir
     @themeSassFiles = {}
 
     @themeDirs.forEach (name) =>
-      themeSassDir = sysPath.join @absRootDir, name , @sassDir
-      files = @_findFilesInDir(themeSassDir, name ,'.scss')
+      themeSassDir = sysPath.join @absAppDir, name , @sassDir
+      files = @_findFilesInDir(themeSassDir, name , sassRe)
       @themeSassFiles[name] = files
+
+#    console.log @themeSassFiles
 
   _findFilesInDir: (startPath, theme, filter) =>
     results = {}
     if !fs.existsSync(startPath)
-      console.log 'no dir ', startPath
       return
     files = fs.readdirSync(startPath)
     i = 0
@@ -50,7 +52,7 @@ class ThemesSASSCompiler
       stat = fs.lstatSync(filename)
       if stat.isDirectory()
         results = extend(results, @_findFilesInDir(filename, theme, filter))
-      else if filename.indexOf(filter) >= 0
+      else if anymatch(filter, filename)
         importPath = filename.replace('_', '').replace(sassRe,'')
         results[importPath] = filename
       i++
@@ -71,13 +73,13 @@ class ThemesSASSCompiler
 
   _urlImporter: (url, prev, theme)=>
     #Convert import urls to absolute paths and match against theme for substitution
+    sassDir = sysPath.join(@absAppDir, theme, @sassDir)
     getAbsImport = (imp_url, prev_url) =>
-      rootSassDir = sysPath.join(@absRootDir, theme, @sassDir)
       if prev_url != "stdin"
-        import_url = sysPath.dirname(sysPath.join(rootSassDir, prev_url.replace(/app\/?base\/?sass\/?/,'')))
+        import_url = sysPath.dirname(sysPath.join(sassDir, prev_url.replace(@baseSassDir, '')))
         import_url = sysPath.join(import_url,imp_url)
       else
-        import_url = sysPath.join(rootSassDir, imp_url.replace(/app\/?base\/?sass\/?/,''))
+        import_url = sysPath.join(sassDir, imp_url.replace(@baseSassDir, ''))
       match_file = @themeSassFiles[theme].hasOwnProperty(import_url)
       if match_file
         import_url = @themeSassFiles[theme][import_url]
@@ -91,11 +93,11 @@ class ThemesSASSCompiler
   _nativeCompile: (source, themeDirs, callback)=>
     theme = themeDirs.pop()
     outputPath = source.outputPath.replace new RegExp(@baseDir), theme
-
     libsass.render {
       data: source.data
       includePaths: @_getIncludePaths(source.path)
       outputStyle: @outStyle
+      indentedSyntax: (sysPath.extname(source.path) == '.sass')
       sourceComments: !@optimize
       sourceMap: true
       outFile: outputPath
@@ -143,7 +145,7 @@ class ThemesSASSCompiler
     outputPath = @outputPath
     for outPath, inPath of @joinTo
         outputPath = sysPath.join(@outputPath, outPath) if anymatch(inPath, path)
-    dirs = @_getDirectories @absRootDir
+    dirs = @_getDirectories @absAppDir
     source =
       data: data
       path: path
