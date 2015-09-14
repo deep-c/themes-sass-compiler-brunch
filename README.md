@@ -21,7 +21,7 @@ Example brunch project with themeing
     - package.json  
     - ...  
 
-If a file of the same name exists in another theme other than 'base' then that file will replace that file (imports as well).
+If a file of the same name exists in another theme other than 'base' then that file will replace the file in base when compiling to css file (imports as well).
 
 For example
 
