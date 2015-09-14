@@ -30,12 +30,12 @@ For example
         - /base (this is the master theme)
             - /sass  
                 - /partials
-                    - header.scss  
-                - base.scss (this file imports header.scss using import) 
+                    - _header.scss  
+                - base.scss (this file imports _header.scss using import) 
         - /theme2 
             - /sass  
                 - /partials
-                    - header.scss (custom header.scss file)
+                    - _header.scss (custom _header.scss file)
 
 Then base.scss is rendered for each theme:  
   
