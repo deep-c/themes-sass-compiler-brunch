@@ -3,6 +3,7 @@ util = require('util')
 libsass = require('node-sass')
 fs = require('fs')
 anymatch = require('anymatch')
+progeny = require('progeny')
 sassRe = /\.s[ac]?ss$/
 
 extend = (object, source) ->
@@ -19,6 +20,7 @@ class ThemesCompiler
     #Set config options
     @config = @cfg
     @theme = @config.env.toString()
+    @rootPath = @cfg.paths.root
     @pluginConfig = (@cfg.plugins && @cfg.plugins.themes ) || {};
     if @pluginConfig.options
       @includePaths = @pluginConfig.options.includePaths if @pluginConfig.options.includePaths
@@ -26,6 +28,10 @@ class ThemesCompiler
       @theme =  @pluginConfig.options.base if !@theme
       @styles = @pluginConfig.options.styles
     @stylesFiles = @_getFilesInDir(sysPath.join(sysPath.resolve('app'), @themes, @theme, @styles), sassRe)
+    @getDependencies = progeny(
+      rootPath: @rootPath
+      altPaths: @includePaths
+      reverseArgs: true)
 
   _getFilesInDir: (dir, filter) ->
     results = {}
