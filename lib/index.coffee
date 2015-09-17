@@ -2,13 +2,8 @@ sysPath = require('path')
 util = require('util')
 libsass = require('node-sass')
 fs = require('fs')
-copy = require('recursive-copy')
-colors = require('colors')
-
-
 anymatch = require('anymatch')
-
-sassRe = /\.[sc][ac]?ss$/
+sassRe = /\.s[ac]?ss$/
 
 extend = (object, source) ->
   for key of source
@@ -22,52 +17,32 @@ class ThemesCompiler
 
   constructor: (@cfg) ->
     #Set config options
-    @brunchConfig = @cfg
-    @pluginConfig = if (@cfg.plugins and @cfg.plugins.themes and @cfg.plugins.themes.options ) then @cfg.plugins.themes.options else {}
-    @pluginConfig.directory = 'themes' if !@pluginConfig.directory
-    @pluginConfig.base = 'base' if !@pluginConfig.base
-    @pluginConfig.styles = 'sass' if !@pluginConfig.styles
+    @config = @cfg
+    @theme = @config.env.toString()
+    @pluginConfig = (@cfg.plugins && @cfg.plugins.themes ) || {};
+    if @pluginConfig.options
+      @includePaths = @pluginConfig.options.includePaths if @pluginConfig.options.includePaths
+      @themes = @pluginConfig.options.directory
+      @theme =  @pluginConfig.options.base if !@theme
+      @styles = @pluginConfig.options.styles
+    @stylesFiles = @_getFilesInDir(sysPath.join(sysPath.resolve('app'), @themes, @theme, @styles), sassRe)
 
-    #Set theme URL's
-    @themesDir = sysPath.resolve 'app', @pluginConfig.directory
-    @baseDir = sysPath.join @themesDir, @pluginConfig.base
-
-    @_copyStyles @_getThemes(@themesDir)
-
-  _getThemes: (path) =>
-    fs.readdirSync(path).filter (file) =>
-      stat = fs.statSync(sysPath.join(path, file))
-      stat if stat.isDirectory() and file != @pluginConfig.base
-
-  _copyStyles: (themes, overwrite=false) =>
-    _themes = themes
-    console.log _themes
-    theme = _themes.pop()
-    from = sysPath.join(@baseDir, @pluginConfig.styles)
-    to = sysPath.join(@themesDir, theme, @pluginConfig.styles)
-
-#    checkDir = (filename, dir) =>
-#      console.log filename, dir
-#      return sysPath.join dir, filename
-#      file_to = file.replace(from, to)
-#      fs.stat file_to, (err, stat) =>
-#        if err
-#          return false
-#        else if stat
-#          return true
-
-    options =
-      overwrite: false
-      dot: false
-      junk: false
-
-    copy from, to, options, (error, results)=>
-      if error
-        console.log error
-      else
-        console.log results
-      @_copyStyles(_themes) if _themes.length
-
+  _getFilesInDir: (dir, filter) ->
+    results = {}
+    if !fs.existsSync(dir)
+      return
+    files = fs.readdirSync(dir)
+    i = 0
+    while i < files.length
+      filename = sysPath.join(dir, files[i])
+      stat = fs.lstatSync(filename)
+      if stat.isDirectory()
+        results = extend(results, @_getFilesInDir(filename, filter))
+      else if anymatch(filter, filename)
+        importPath = filename.replace('_', '').replace(sassRe,'')
+        results[importPath] = filename
+      i++
+    results
 
   _getIncludePaths: (path) =>
     includePaths = [
@@ -78,14 +53,36 @@ class ThemesCompiler
       includePaths = includePaths.concat(@includePaths)
     includePaths
 
+  _urlImporter: (url, prev) =>
+    #Convert import urls to absolute paths and match against theme for substitution
+    sassDir = sysPath.join(sysPath.resolve('app'), @themes, @theme, @styles)
+    baseDir = sysPath.join('app', @themes, @pluginConfig.options.base, @styles)
+
+    getAbsImport = (imp_url, prev_url) =>
+      if prev_url != "stdin"
+        import_url = sysPath.dirname(sysPath.join(sassDir, prev_url.replace(baseDir, '')))
+        import_url = sysPath.join(import_url,imp_url)
+      else
+        import_url = sysPath.join(sassDir, imp_url.replace(baseDir, ''))
+      match_file = @stylesFiles.hasOwnProperty(import_url)
+      import_url = if match_file then @stylesFiles[import_url] else imp_url
+      import_url
+
+    if @theme != @pluginConfig.options.base
+      url = getAbsImport(url, prev)
+
+    return { file: url }
+
   _nativeCompile: (source, callback)=>
     libsass.render {
       data: source.data
       includePaths: @_getIncludePaths(source.path)
-      outputStyle: (@brunchConfig.optimize) ? 'compressed':'nested'
+      outputStyle: (@config.optimize) ? 'compressed':'nested'
       indentedSyntax: (sysPath.extname(source.path) == '.sass')
       sourceComments: !@optimize
-      sourceMap: true
+      importer: (url, prev, done)=>
+          result = @_urlImporter(url, prev)
+          return { file: result.file }
     }, (error, result) =>
       if error
         callback error.message || util.inspect(error)
