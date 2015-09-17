@@ -46,4 +46,4 @@ Then base.scss is rendered for each theme:
 
 Known Issues  
 + ~~Currently file import substition only works with scss not sass due to pattern matching error~~
-+ Had to circumvent brunch pipline callback on compile due to being unable to control multiple files being written based on single path passed to compile.
++ ~~Had to circumvent brunch pipline callback on compile due to being unable to control multiple files being written based on single path passed to compile.~~
