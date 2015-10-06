@@ -27,7 +27,8 @@ class ThemesCompiler
       @themes = @pluginConfig.options.directory
       @theme =  @pluginConfig.options.base if !@theme
       @styles = @pluginConfig.options.styles
-    @stylesFiles = @_getFilesInDir(sysPath.join(sysPath.resolve('app'), @themes, @theme, @styles), sassRe)
+    files = @_getFilesInDir(sysPath.join(sysPath.resolve('app'), @themes, @theme, @styles), sassRe)
+    @stylesFiles = if files then files else {}
     @getDependencies = progeny(
       rootPath: @rootPath
       altPaths: @includePaths
